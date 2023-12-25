@@ -1,0 +1,8 @@
+mlx
+safetensors
+huggingface-hub
+regex
+numpy
+tqdm
+Pillow
+streamlit
