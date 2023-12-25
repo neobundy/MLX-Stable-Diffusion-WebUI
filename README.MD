@@ -54,4 +54,4 @@ How to Run
 =============
 To run the example, simply type in terminal:
 
-    streamlit run ./MLX-Stable-Diffusion/main.py
+    streamlit run ./MLX-Stable-Diffusion-WebUI/main.py
