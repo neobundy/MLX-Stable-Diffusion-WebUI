@@ -2,7 +2,7 @@ _AVAILABLE_MODELS = [
     "stabilityai/stable-diffusion-2-1-base",
     "Lykon/dreamshaper-8",
     "Lykon/absolute-reality-1.81",
-    # "stabilityai/sdxl-turbo",
+    "stabilityai/sdxl-turbo",
     # "Lykon/dreamshaper-xl-turbo",
     # "stabilityai/stable-diffusion-xl-base-1.0",
 ]
