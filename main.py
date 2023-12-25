@@ -22,7 +22,7 @@ st.sidebar.title("Options")
 prompt = st.sidebar.text_input("Prompt")
 negative_prompt = st.sidebar.text_input("Negative Prompt")
 
-st.title("Apple MLX Stable Diffusion")
+st.title("Apple MLX Stable Diffusion WebUI")
 
 n_images = st.sidebar.slider("Number of images", min_value=1, max_value=10, value=4)
 n_rows = st.sidebar.slider("Number of rows", min_value=1, max_value=10, value=2)
