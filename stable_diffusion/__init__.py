@@ -2,8 +2,10 @@
 
 import time
 from typing import Tuple
-
+from PIL import Image
+import numpy as np
 import mlx.core as mx
+import streamlit as st
 
 from .model_io import (
     load_unet,
@@ -42,15 +44,18 @@ class StableDiffusion:
         self.tokenizer = load_tokenizer(model)
 
     def generate_latents(
-        self,
-        text: str,
-        n_images: int = 1,
-        num_steps: int = 50,
-        cfg_weight: float = 7.5,
-        negative_text: str = "",
-        latent_size: Tuple[int] = (64, 64),
-        seed=None,
+            self,
+            text: str,
+            input_image: Image.Image = None,
+            n_images: int = 1,
+            num_steps: int = 50,
+            cfg_weight: float = 7.5,
+            negative_text: str = "",
+            latent_size: Tuple[int] = (64, 64),
+            seed=None,
+            denoising_strength=0.7,
     ):
+
         # Set the PRNG state
         seed = seed or int(time.time())
         mx.random.seed(seed)
@@ -72,12 +77,77 @@ class StableDiffusion:
             conditioning = _repeat(conditioning, n_images, axis=0)
 
         # Create the latent variables
-        x_T = self.sampler.sample_prior(
-            (n_images, *latent_size, self.autoencoder.latent_channels), dtype=self.dtype
-        )
+        if input_image is not None:
+            # Convert the input image to a mlx array
+            input_image = input_image.resize((512, 512))
+            input_image = mx.array(np.array(input_image))
+
+            # Visualize the input image
+            input_image_np = np.array(input_image.tolist())
+            st.image(input_image_np.squeeze(), caption='Resized Input Image')
+
+            input_image = mx.clip(input_image / 127.5 - 1, -1, 1)
+            input_image = mx.expand_dims(input_image, axis=0)
+
+            # Visualize the input image
+            input_image_np = np.array(input_image.tolist())
+            # Normalize the input image to the range [0, 1]
+            input_image_np = (input_image_np + 1) / 2
+            st.image(input_image_np.squeeze(), caption='Normalized Input Image')
+
+            # Add noise to the input image
+            input_image = self.autoencoder.encode(input_image)
+            noise = mx.random.normal(shape=input_image.shape, dtype=input_image.dtype)
+            input_image += noise
+
+            # Normalize the input image to the range [0, 1]
+            input_image_np = np.array(input_image.tolist())
+            input_image_np = (input_image_np - input_image_np.min()) / (input_image_np.max() - input_image_np.min())
+
+            # Visualize the input image
+            st.image(input_image_np.squeeze(), caption='Noised Input Image After 1st Transpose')
+
+            # Rearrange the dimensions to [B, C, H, W]
+            input_image = mx.transpose(input_image, (0, 3, 1, 2))
+
+            # # Rearrange the dimensions to [B, H, W, C] - Autoencoder expects: B, H, W, C = x.shape
+            input_image = mx.transpose(input_image, (0, 2, 3, 1))
+
+            # Visualize the input image
+            input_image_np = np.array(input_image.tolist())
+            input_image_np = (input_image_np - input_image_np.min()) / (input_image_np.max() - input_image_np.min())
+
+            # Visualize the input image
+            st.image(input_image_np.squeeze(), caption='Noised Input Image After 2nd Transpose')
+
+            # Use the noisy image as the latent variable
+
+            latents = []
+            for _ in range(n_images):
+                # latent = self.sampler.add_noise(input_image, mx.ones(n_images))
+                latent = input_image
+                latents.append(latent)
+            latents = mx.concatenate(latents, axis=0)
+
+            # Visualize the latent space
+            latents_np = np.array(latents.tolist())
+            latents_np = (latents_np - latents_np.min()) / (latents_np.max() - latents_np.min())
+            st.text("Latent Space")
+            st.image(latents_np.squeeze())
+
+        else:
+            latents = self.sampler.sample_prior(
+                (n_images, *latent_size, self.autoencoder.latent_channels), dtype=self.dtype
+            )
+
+            # Visualize the latent space
+            latents_np = np.array(latents.tolist())
+            latents_np = (latents_np - latents_np.min()) / (latents_np.max() - latents_np.min())
+            st.text("Latent Space")
+            st.image(latents_np.squeeze())
 
         # Perform the denoising loop
-        x_t = x_T
+        x_t = latents
         for t, t_prev in self.sampler.timesteps(num_steps, dtype=self.dtype):
             x_t_unet = mx.concatenate([x_t] * 2, axis=0) if cfg_weight > 1 else x_t
             t_unet = mx.broadcast_to(t, [len(x_t_unet)])

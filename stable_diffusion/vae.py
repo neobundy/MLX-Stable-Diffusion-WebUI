@@ -252,6 +252,16 @@ class Autoencoder(nn.Module):
             config.latent_channels_in, config.latent_channels_in
         )
 
+    def encode(self, x):
+        x = self.encoder(x)
+        x = self.quant_proj(x)
+
+        mean, logvar = x.split(2, axis=-1)
+        std = mx.exp(0.5 * logvar)
+        z = mx.random.normal(mean.shape) * std + mean
+
+        return z
+
     def decode(self, z):
         return self.decoder(self.post_quant_proj(z))
 

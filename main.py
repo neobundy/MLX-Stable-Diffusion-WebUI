@@ -19,6 +19,15 @@ _THUMB = "thumb.jpeg"
 selected_model = st.sidebar.selectbox('Select a model', _AVAILABLE_MODELS, index=0)
 
 st.sidebar.title("Options")
+
+# Add the image uploader widget to the sidebar
+uploaded_file = st.sidebar.file_uploader("Choose an image for I2I", type=["jpg", "jpeg", "png"])
+if uploaded_file is not None:
+    input_image = Image.open(uploaded_file).convert("RGB")
+    st.sidebar.image(input_image, caption='Uploaded Image', use_column_width=True)
+else:
+    input_image = None
+
 prompt = st.sidebar.text_input("Prompt")
 negative_prompt = st.sidebar.text_input("Negative Prompt")
 
@@ -39,6 +48,7 @@ if st.button("Generate"):
     # Generate the latent vectors using diffusion
     latents = sd.generate_latents(
         prompt,
+        input_image=input_image,
         n_images=n_images,
         cfg_weight=cfg,
         num_steps=steps,

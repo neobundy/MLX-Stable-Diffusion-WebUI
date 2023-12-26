@@ -49,6 +49,8 @@ class SimpleEulerSampler:
             [mx.zeros(1), ((1 - alphas_cumprod) / alphas_cumprod).sqrt()]
         )
 
+        self.strength = 0.0
+
     def sample_prior(self, shape, dtype=mx.float32, key=None):
         noise = mx.random.normal(shape, key=key)
         return (
@@ -72,3 +74,8 @@ class SimpleEulerSampler:
         x_t_prev = x_t_prev * (sigma_prev.square() + 1).rsqrt()
 
         return x_t_prev
+
+    def add_noise(self, x, t: int):
+        sigma = self.sigmas(t)
+        eps_pred = mx.random.normal(shape=x.shape, dtype=x.dtype) * sigma
+        return self.step(eps_pred, x, t, t + 1)
