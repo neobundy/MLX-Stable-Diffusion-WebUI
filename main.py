@@ -58,6 +58,11 @@ if st.button("Generate"):
         decoded.append(sd.decode(x_t[i : i + decoding_batch_size]))
         mx.eval(decoded[-1])
 
+    # If n_images is not a multiple of n_rows, pad the decoded list with empty images
+    if n_images % n_rows != 0:
+        for _ in range(n_rows - (n_images % n_rows)):
+            decoded.append(mx.zeros_like(decoded[0]))
+
     # Arrange them on a grid
     x = mx.concatenate(decoded, axis=0)
     x = mx.pad(x, [(0, 0), (8, 8), (8, 8), (0, 0)])
