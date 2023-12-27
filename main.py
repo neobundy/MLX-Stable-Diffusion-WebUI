@@ -22,6 +22,8 @@ st.sidebar.title("Options")
 
 # Add the image uploader widget to the sidebar
 uploaded_file = st.sidebar.file_uploader("Choose an image for I2I", type=["jpg", "jpeg", "png"])
+denoising_strength = st.sidebar.slider("Denoising Strength", min_value=0.1, max_value=1.0, value=0.7)
+
 if uploaded_file is not None:
     input_image = Image.open(uploaded_file).convert("RGB")
     st.sidebar.image(input_image, caption='Uploaded Image', use_column_width=True)
@@ -53,6 +55,7 @@ if st.button("Generate"):
         cfg_weight=cfg,
         num_steps=steps,
         negative_text=negative_prompt,
+        denoising_strength=denoising_strength,
     )
 
     progress_bar = st.progress(0)

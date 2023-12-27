@@ -18,6 +18,21 @@ from .model_io import (
 from .sampler import SimpleEulerSampler
 
 
+def visualize_tensor(x: mx.array, caption: str = "", normalize:bool = False, placeholder: st.empty = None):
+    # Convert the mlx array to a numpy array
+    x_np = np.array(x.tolist())
+
+    # Normalize or scale the tensor
+    x_np = (x_np - x_np.min()) / (x_np.max() - x_np.min()) if normalize else (x_np + 1) / 2
+
+    # Squeeze the tensor to remove single-dimensional entries from the shape
+    x_np = x_np.squeeze()
+
+    # Display the image with or without a placeholder
+    display_function = placeholder.image if placeholder is not None else st.image
+    display_function(x_np, caption=caption if caption else None)
+
+
 def _repeat(x, n, axis):
     # Make the expanded shape
     s = x.shape
@@ -82,30 +97,16 @@ class StableDiffusion:
             input_image = input_image.resize((512, 512))
             input_image = mx.array(np.array(input_image))
 
-            # Visualize the input image
-            input_image_np = np.array(input_image.tolist())
-            st.image(input_image_np.squeeze(), caption='Resized Input Image')
-
             input_image = mx.clip(input_image / 127.5 - 1, -1, 1)
             input_image = mx.expand_dims(input_image, axis=0)
 
             # Visualize the input image
-            input_image_np = np.array(input_image.tolist())
-            # Normalize the input image to the range [0, 1]
-            input_image_np = (input_image_np + 1) / 2
-            st.image(input_image_np.squeeze(), caption='Normalized Input Image')
+            visualize_tensor(input_image, caption='Normalized Input Image', normalize=False)
 
             # Add noise to the input image
             input_image = self.autoencoder.encode(input_image)
-            noise = mx.random.normal(shape=input_image.shape, dtype=input_image.dtype)
-            input_image += noise
 
-            # Normalize the input image to the range [0, 1]
-            input_image_np = np.array(input_image.tolist())
-            input_image_np = (input_image_np - input_image_np.min()) / (input_image_np.max() - input_image_np.min())
-
-            # Visualize the input image
-            st.image(input_image_np.squeeze(), caption='Noised Input Image After 1st Transpose')
+            visualize_tensor(input_image, caption='Input Image with Noise', normalize=True)
 
             # Rearrange the dimensions to [B, C, H, W]
             input_image = mx.transpose(input_image, (0, 3, 1, 2))
@@ -113,27 +114,17 @@ class StableDiffusion:
             # # Rearrange the dimensions to [B, H, W, C] - Autoencoder expects: B, H, W, C = x.shape
             input_image = mx.transpose(input_image, (0, 2, 3, 1))
 
-            # Visualize the input image
-            input_image_np = np.array(input_image.tolist())
-            input_image_np = (input_image_np - input_image_np.min()) / (input_image_np.max() - input_image_np.min())
-
-            # Visualize the input image
-            st.image(input_image_np.squeeze(), caption='Noised Input Image After 2nd Transpose')
-
             # Use the noisy image as the latent variable
 
             latents = []
             for _ in range(n_images):
-                # latent = self.sampler.add_noise(input_image, mx.ones(n_images))
-                latent = input_image
+                latent = self.sampler.add_noise(input_image, num_steps, denoising_strength)
                 latents.append(latent)
             latents = mx.concatenate(latents, axis=0)
 
             # Visualize the latent space
-            latents_np = np.array(latents.tolist())
-            latents_np = (latents_np - latents_np.min()) / (latents_np.max() - latents_np.min())
             st.text("Latent Space")
-            st.image(latents_np.squeeze())
+            visualize_tensor(latents, normalize=True)
 
         else:
             latents = self.sampler.sample_prior(
@@ -141,25 +132,55 @@ class StableDiffusion:
             )
 
             # Visualize the latent space
-            latents_np = np.array(latents.tolist())
-            latents_np = (latents_np - latents_np.min()) / (latents_np.max() - latents_np.min())
-            st.text("Latent Space")
-            st.image(latents_np.squeeze())
+            visualize_tensor(latents, normalize=True)
 
         # Perform the denoising loop
         x_t = latents
-        for t, t_prev in self.sampler.timesteps(num_steps, dtype=self.dtype):
-            x_t_unet = mx.concatenate([x_t] * 2, axis=0) if cfg_weight > 1 else x_t
-            t_unet = mx.broadcast_to(t, [len(x_t_unet)])
-            eps_pred = self.unet(x_t_unet, t_unet, encoder_x=conditioning)
+        latent_image_placeholder = st.empty()
 
-            if cfg_weight > 1:
-                eps_text, eps_neg = eps_pred.split(2)
-                eps_pred = eps_neg + cfg_weight * (eps_text - eps_neg)
+        # x_t: latent tensor at timestep t
+        # t: current timestep mx.array (1000, 980, 960... when num_steps is 50)
+        # t_prev: previous timestep mx.array (980, 960, 940... when num_steps is 50)
+        # sampler.timesteps(num_steps, dtype=self.dtype) returns a generator
+        #   timesteps() create a sequence of timestep pairs for a process involving a list of `sigmas`.
+        #   The code uses a method `_linspace` which is presumably similar to NumPy's `linspace` function, designed to create evenly spaced numbers over a specified interval.
+        if input_image is not None:
+            timesteps = self.sampler.timesteps(num_steps, dtype=self.dtype)
+            first_timestep_value = timesteps[-1][0].item()
+            st.text(f"First Timestep Value: {first_timestep_value}")
+            for t, t_prev in self.sampler.timesteps(num_steps, dtype=self.dtype):
+                print(f"Current Timestep: {t.item()}")
+                x_t_unet = mx.concatenate([x_t] * 2, axis=0) if cfg_weight > 1 else x_t
+                t_unet = mx.broadcast_to(t, [len(x_t_unet)])
+                eps_pred = self.unet(x_t_unet, t_unet, encoder_x=conditioning)
 
-            x_t_prev = self.sampler.step(eps_pred, x_t, t, t_prev)
-            x_t = x_t_prev
-            yield x_t
+                if cfg_weight > 1:
+                    eps_text, eps_neg = eps_pred.split(2)
+                    eps_pred = eps_neg + cfg_weight * (eps_text - eps_neg)
+
+                x_t_prev = self.sampler.step(eps_pred, x_t, t, t_prev)
+                x_t = x_t_prev
+
+                # Visualize the latent space
+                visualize_tensor(x_t, normalize=True, placeholder=latent_image_placeholder)
+                yield x_t
+
+        else:
+            for t, t_prev in self.sampler.timesteps(num_steps, dtype=self.dtype):
+                x_t_unet = mx.concatenate([x_t] * 2, axis=0) if cfg_weight > 1 else x_t
+                t_unet = mx.broadcast_to(t, [len(x_t_unet)])
+                eps_pred = self.unet(x_t_unet, t_unet, encoder_x=conditioning)
+
+                if cfg_weight > 1:
+                    eps_text, eps_neg = eps_pred.split(2)
+                    eps_pred = eps_neg + cfg_weight * (eps_text - eps_neg)
+
+                x_t_prev = self.sampler.step(eps_pred, x_t, t, t_prev)
+                x_t = x_t_prev
+
+                # Visualize the latent space
+                visualize_tensor(x_t, normalize=True, placeholder=latent_image_placeholder)
+                yield x_t
 
     def decode(self, x_t):
         x = self.autoencoder.decode(x_t / self.autoencoder.scaling_factor)
