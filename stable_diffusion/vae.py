@@ -42,6 +42,8 @@ class Attention(nn.Module):
         return x
 
 
+# Skip connections (Residual blocks) + downsampling + upsampling: common building blocks for Encoder and Decoder
+
 class EncoderDecoderBlock2D(nn.Module):
     def __init__(
         self,
@@ -102,6 +104,7 @@ class Encoder(nn.Module):
     ):
         super().__init__()
 
+        # (B, H, W, C) -> (B, H, W, 64)
         self.conv_in = nn.Conv2d(
             in_channels, block_out_channels[0], kernel_size=3, stride=1, padding=1
         )
@@ -139,15 +142,20 @@ class Encoder(nn.Module):
         self.conv_out = nn.Conv2d(block_out_channels[-1], out_channels, 3, padding=1)
 
     def __call__(self, x):
+
+        # input block
         x = self.conv_in(x)
 
+        # downsample + feature increase blocks
         for l in self.down_blocks:
             x = l(x)
 
+        # residual block + attention + residual block
         x = self.mid_blocks[0](x)
         x = self.mid_blocks[1](x)
         x = self.mid_blocks[2](x)
 
+        # normalization + activation + output block
         x = self.conv_norm_out(x)
         x = nn.silu(x)
         x = self.conv_out(x)
@@ -254,9 +262,22 @@ class Autoencoder(nn.Module):
 
     def encode(self, x):
         x = self.encoder(x)
+
+        # This line applies the linear transformation to the tensor x.
+        # The purpose of this operation is to transform the features extracted by the encoder into a form suitable for quantization.
+        # In this case, the transformation doesn't change the dimensionality of the data (as both input and output dimensions are config.latent_channels_out),
+        # but it can still learn to make the data more suitable for the subsequent operations (like splitting into mean and logvar).
+        # The term "projection" in quant_proj refers to the operation of applying a linear transformation to the data,
+        # which can be thought of as "projecting" the data onto a different subspace. This is a common operation in machine learning models,
+        # and it is used here to transform the data into a form that is suitable for the subsequent operations in the VAE.
         x = self.quant_proj(x)
 
+        # two tensors of size (B, C, H, W) where C = latent_channels_in
         mean, logvar = x.split(2, axis=-1)
+
+        # Transforming the noise to match the mean and variance: N(0, 1) -> N(mean, std)
+        # x = mean + std * Z where Z ~ N(0, 1)
+
         std = mx.exp(0.5 * logvar)
         z = mx.random.normal(mean.shape) * std + mean
 
@@ -266,13 +287,7 @@ class Autoencoder(nn.Module):
         return self.decoder(self.post_quant_proj(z))
 
     def __call__(self, x, key=None):
-        x = self.encoder(x)
-        x = self.quant_proj(x)
-
-        mean, logvar = x.split(2, axis=-1)
-        std = mx.exp(0.5 * logvar)
-        z = mx.random.normal(mean.shape, key=key) * std + mean
-
+        z = self.encode(x)
         x_hat = self.decode(z)
 
         return dict(x_hat=x_hat, z=z, mean=mean, logvar=logvar)

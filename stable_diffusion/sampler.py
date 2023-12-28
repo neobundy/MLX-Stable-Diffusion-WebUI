@@ -12,10 +12,7 @@ def _linspace(a, b, num):
 
 def _interp(y, x_new):
     """Interpolate the function defined by (arange(0, len(y)), y) at positions x_new."""
-
     # x_new is an mx array containing all the timesteps: 1000, 980, 960, 940... if num_steps is 50.
-
-
     x_low = x_new.astype(mx.int32)
     x_high = mx.minimum(x_low + 1, len(y) - 1)
 
@@ -78,11 +75,24 @@ class SimpleEulerSampler:
 
         return x_t_prev
 
-    def add_noise(self, x, num_steps, t: int, denoising_strength=0.7, dtype=mx.float32):
-        total_timesteps = len(self._sigmas) - 1
-        t_current = total_timesteps * denoising_strength
+    def add_noise(self, x, denoising_strength=0.7):
+        """
+        Adds noise to the input image tensor.
 
-        sigma = self.sigmas(mx.array([t_current], dtype=dtype))
-        eps = mx.random.normal(shape=x.shape, dtype=dtype) * sigma
+        Args:
+        - x (mlx.array): The input image tensor.
+        - denoising_strength (float): The strength of the noise to be added (between 0 and 1).
 
-        return x + eps
+        Returns:
+        - mlx.array: The noisy image tensor.
+        """
+        # Ensuring denoising_strength is within the valid range
+        denoising_strength = max(0, min(denoising_strength, 1))
+
+        # Generating noise
+        noise = mx.random.normal(shape=x.shape, dtype=x.dtype)
+
+        # Adding noise to the image
+        noisy_image = x + noise * denoising_strength
+
+        return noisy_image

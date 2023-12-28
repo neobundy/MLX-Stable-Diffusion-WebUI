@@ -57,6 +57,13 @@ def map_unet_weights(key, value):
 
         return [(k1, _from_numpy(v1)), (k2, _from_numpy(v2))]
 
+    # The weights of this 1x1 convolutional layer would be a 4-dimensional tensor
+    # with shape [out_channels, in_channels, 1, 1].
+    # The squeeze() function is used to remove the dimensions of size 1 from this tensor,
+    # converting it to a 2-dimensional tensor with shape [out_channels, in_channels].
+    # This is because the corresponding layer in the current model might be a linear layer
+    # rather than a convolutional layer, and the weights for a linear layer are expected to be a 2-dimensional tensor.
+
     if "conv_shortcut.weight" in key:
         value = value.squeeze()
 
@@ -132,6 +139,7 @@ def map_vae_weights(key, value):
     if "conv_shortcut.weight" in key:
         value = value.squeeze()
 
+    # Rearrange the dimensions to [B, H, W, C] - Autoencoder expects: B, H, W, C = x.shape
     if len(value.shape) == 4:
         value = value.transpose(0, 2, 3, 1)
 

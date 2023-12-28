@@ -21,6 +21,7 @@ class TimestepEmbedding(nn.Module):
     def __init__(self, in_channels: int, time_embed_dim: int):
         super().__init__()
 
+        # (1, 320) -> (1, 320 * 4 = 1280)
         self.linear_1 = nn.Linear(in_channels, time_embed_dim)
         self.linear_2 = nn.Linear(time_embed_dim, time_embed_dim)
 
@@ -68,8 +69,6 @@ class TransformerBlock(nn.Module):
 
         # Cross attention
         y = self.norm2(x)
-
-
         y = self.attn2(y, memory, memory, memory_mask)
         x = x + y
 
@@ -148,6 +147,25 @@ class ResnetBlock2D(nn.Module):
         self.conv2 = nn.Conv2d(
             out_channels, out_channels, kernel_size=3, stride=1, padding=1
         )
+
+        # The weights of this 1x1 convolutional layer would be a 4-dimensional tensor
+        # with shape [out_channels, in_channels, 1, 1].
+        # The squeeze() function is used to remove the dimensions of size 1 from this tensor,
+        # converting it to a 2-dimensional tensor with shape [out_channels, in_channels].
+        # This is because the corresponding layer in the current model might be a linear layer
+        # rather than a convolutional layer, and the weights for a linear layer are expected to be a 2-dimensional tensor.
+        # the relevant code in stable_diffusion/model_io.py:
+        # if "conv_shortcut.weight" in key:
+        #     value = value.squeeze()
+
+        # The shortcut connection in the ResnetBlock2D class.
+        # The if condition checks if the number of input channels (in_channels) is not equal to the number of output channels (out_channels).
+        # If they are not equal, a linear transformation (nn.Linear(in_channels, out_channels)) is created and assigned to self.conv_shortcut.
+        # This linear transformation is used to match the dimensions of the input and output of the residual block.
+        # In a residual block, the input is added to the output after going through a series of transformations.
+        # If the dimensions of the input and output are not the same, this addition operation would not be possible.
+        # Therefore, a shortcut connection that transforms the input to have the same dimensions as the output is needed,
+        # which is what self.conv_shortcut is doing here.
 
         if in_channels != out_channels:
             self.conv_shortcut = nn.Linear(in_channels, out_channels)
