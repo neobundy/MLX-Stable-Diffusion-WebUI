@@ -83,7 +83,7 @@ class StableDiffusion:
             negative_text: str = "",
             latent_size: Tuple[int] = (64, 64),
             seed=None,
-            denoising_strength=0.7,
+            noise_strength=0.7,
     ):
 
         # Set the PRNG state
@@ -111,17 +111,29 @@ class StableDiffusion:
             # Convert the input image to a mlx array
             input_image = input_image.resize((IMAGE_WIDTH, IMAGE_HEIGHT))
             input_image = mx.array(np.array(input_image))
-            input_image = normalize_tensor(input_image, (0, 255), (-1, 1))
+            input_image = normalize_tensor(input_image, (input_image.min(), input_image.max()), (-1, 1))
             input_image = mx.expand_dims(input_image, axis=0)
 
+            print(f"Input image before encoding (first 50 values): {input_image.flatten()[:50]}")
             # Encode the input image to get the latent representation
             latents = self.autoencoder.encode(input_image)
+            latents = normalize_tensor(latents, (latents.min(), latents.max()), (-1, 1))
+
+            print(f"Latent after encoding (first 50 values): {latents.flatten()[:50]}")
 
             # Generate a tensor of random values with the same shape as the latent representation
-            encoder_noise = mx.random.normal(shape=latents.shape, dtype=self.dtype) * denoising_strength
+            encoder_noise = mx.random.normal(shape=latents.shape, dtype=self.dtype)
 
-            # # Add the noise to the latent representation
-            # latents = latents + encoder_noise
+            encoder_noise = normalize_tensor(encoder_noise, (encoder_noise.min(), encoder_noise.max()), (-1, 1))
+
+            encoder_noise *= noise_strength
+
+            print(f"Encoder noise (first 50 values): {encoder_noise.flatten()[:50]}")
+
+            # Add the noise to the latent representation
+            latents = latents + encoder_noise
+
+            print(f"Latents after adding noise (first 50 values): {latents.flatten()[:50]}")
 
             visualize_tensor(latents, caption='Input Image with Noise', normalize=True)
 
@@ -149,6 +161,7 @@ class StableDiffusion:
         if input_image is not None:
             # Unet expects: B, H, W, C = x.shape
             x_t = mx.transpose(x_t, (0, 3, 1, 2))
+
         latent_image_placeholder = st.empty()
 
         # x_t: latent tensor at timestep t
@@ -181,7 +194,6 @@ class StableDiffusion:
             yield x_t
 
     def decode(self, x_t):
-        visualize_tensor(x_t, normalize=True, caption="Before decoding.")
         x = self.autoencoder.decode(x_t / self.autoencoder.scaling_factor)
         x = mx.minimum(1, mx.maximum(0, x / 2 + 0.5))
         return x
