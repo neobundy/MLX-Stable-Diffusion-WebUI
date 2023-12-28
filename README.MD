@@ -23,7 +23,7 @@ What's New
 
     Absolute-reality-1.81
 
-👉 Crude Implmentation of Image to Image Generation
+👉 Crude Implementation of Image to Image Generation
 
 Installation
 =============
