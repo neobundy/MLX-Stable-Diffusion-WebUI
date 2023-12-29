@@ -17,6 +17,8 @@ from .model_io import (
 )
 from .sampler import SimpleEulerSampler
 
+from utils import debug_print
+
 
 IMAGE_WIDTH = 512
 IMAGE_HEIGHT = 512
@@ -83,7 +85,7 @@ class StableDiffusion:
             negative_text: str = "",
             latent_size: Tuple[int] = (64, 64),
             seed=None,
-            noise_strength=0.7,
+            image_strength=0.7,
     ):
 
         # Set the PRNG state
@@ -114,34 +116,47 @@ class StableDiffusion:
             input_image = normalize_tensor(input_image, (input_image.min(), input_image.max()), (-1, 1))
             input_image = mx.expand_dims(input_image, axis=0)
 
-            print(f"Input image before encoding (first 50 values): {input_image.flatten()[:50]}")
+            debug_print(f"Input image before encoding (first 50 values): {input_image.flatten()[:50]}")
             # Encode the input image to get the latent representation
             latents = self.autoencoder.encode(input_image)
             latents = normalize_tensor(latents, (latents.min(), latents.max()), (-1, 1))
 
-            print(f"Latent after encoding (first 50 values): {latents.flatten()[:50]}")
+            debug_print(f"Latent after encoding (first 50 values): {latents.flatten()[:50]}")
 
-            # Generate a tensor of random values with the same shape as the latent representation
-            encoder_noise = mx.random.normal(shape=latents.shape, dtype=self.dtype)
+            # Initialize an empty list to store the latents for each image
+            latents_list = []
+            captions = []
+            image_number = 1
+            for _ in range(n_images):
+                # Generate a tensor of random values with the same shape as the latent representation
+                encoder_noise = mx.random.normal(shape=latents.shape, dtype=self.dtype)
 
-            encoder_noise = normalize_tensor(encoder_noise, (encoder_noise.min(), encoder_noise.max()), (-1, 1))
+                encoder_noise = normalize_tensor(encoder_noise, (encoder_noise.min(), encoder_noise.max()), (-1, 1))
 
-            encoder_noise *= noise_strength
+                encoder_noise *= image_strength
 
-            print(f"Encoder noise (first 50 values): {encoder_noise.flatten()[:50]}")
+                debug_print(f"Encoder noise (first 50 values): {encoder_noise.flatten()[:50]}")
 
-            # Add the noise to the latent representation
-            latents = latents + encoder_noise
+                # Add the noise to the latent representation
+                noisy_latents = latents + encoder_noise
+                latents_list.append(noisy_latents)
+                captions.append(f"Input Image {image_number} with Noise")
+                image_number += 1
 
-            print(f"Latents after adding noise (first 50 values): {latents.flatten()[:50]}")
+                debug_print(f"Latents after adding noise (first 50 values): {latents.flatten()[:50]}")
 
-            visualize_tensor(latents, caption='Input Image with Noise', normalize=True)
+            # Create columns for the grid
+            cols = st.columns(n_images)
+            # Visualize the input image with noise
+            for i in range(n_images):
+                with cols[i]:
+                    visualize_tensor(latents_list[i], caption=captions[i], normalize=True)
+
+            # Duplicate the noisy latents
+            latents = mx.concatenate(latents_list, axis=0)
 
             # Rearrange the dimensions to [B, H, W, C] - Autoencoder expects: B, H, W, C = x.shape
             latents = mx.transpose(latents, (0, 2, 3, 1))
-
-            # Duplicate the noisy latents
-            latents = mx.concatenate([latents] * n_images, axis=0)
 
             # Visualize the latent space
             st.text("Latent Space")
@@ -149,6 +164,7 @@ class StableDiffusion:
             visualize_tensor(latent_image, normalize=True)
 
         else:
+            #     def sample_prior(self, shape, dtype=mx.float32, key=None):
             latents = self.sampler.sample_prior(
                 (n_images, *latent_size, self.autoencoder.latent_channels), dtype=self.dtype
             )
@@ -156,12 +172,13 @@ class StableDiffusion:
             # Visualize the latent space
             visualize_tensor(latents, normalize=True)
 
-        # Perform the denoising loop
         x_t = latents
         if input_image is not None:
             # Unet expects: B, H, W, C = x.shape
             x_t = mx.transpose(x_t, (0, 3, 1, 2))
 
+        debug_print(f"the final shape of latents: {x_t.shape}")
+        # Perform the denoising loop
         latent_image_placeholder = st.empty()
 
         # x_t: latent tensor at timestep t
