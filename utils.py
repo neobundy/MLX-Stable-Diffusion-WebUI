@@ -1,4 +1,4 @@
-debug = False  # Set this to False if you don't want to print debug messages
+debug = True  # Set this to False if you don't want to print debug messages
 
 
 def debug_print(*args, **kwargs):

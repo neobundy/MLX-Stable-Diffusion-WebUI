@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 from tqdm import tqdm
+import time
 
 import mlx.core as mx
 
@@ -22,13 +23,28 @@ st.sidebar.title("Options")
 
 # Add the image uploader widget to the sidebar
 uploaded_file = st.sidebar.file_uploader("Choose an image for I2I", type=["jpg", "jpeg", "png"])
-denoising_strength = st.sidebar.slider("Image Strength", min_value=0.1, max_value=1.0, value=0.7)
+image_strength = st.sidebar.slider("Image Strength", min_value=0.1, max_value=1.0, value=0.7)
 
 if uploaded_file is not None:
     input_image = Image.open(uploaded_file).convert("RGB")
     st.sidebar.image(input_image, caption='Uploaded Image', use_column_width=True)
 else:
     input_image = None
+
+# Add a text box and a button to recall the seed number
+seed_number = "-1" if 'seed' not in st.session_state else str(st.session_state['seed'])
+seed_number = int(st.sidebar.text_input("Seed Number", value=seed_number))
+
+if st.sidebar.button("Random Seed Number"):
+    seed_number = "-1"
+    st.session_state['seed'] = seed_number
+    st.experimental_rerun()
+if st.sidebar.button("Recall Seed Number"):
+    if 'seed' in st.session_state:
+        seed_number = str(st.session_state['seed'])
+    else:
+        seed_number = "-1"
+    st.session_state['seed'] = seed_number
 
 prompt = st.sidebar.text_input("Prompt")
 negative_prompt = st.sidebar.text_input("Negative Prompt")
@@ -43,8 +59,15 @@ decoding_batch_size = st.sidebar.slider("Batch size", min_value=1, max_value=10,
 output = st.sidebar.text_input("Output file name", value=_DEFAULT_OUTPUT)
 
 if st.button("Generate"):
+    # Retrieve the seed number from the session state
+    seed_number = st.session_state.get('seed', None)
 
-    st.text("Generating images using the checkpoint: " + selected_model)
+    # If the seed number is not set in the session state, generate a new one
+    if seed_number is None or int(seed_number) == -1:
+        seed_number = int(time.time())
+        st.session_state['seed'] = seed_number
+
+    st.text(f"Generating images using the checkpoint(seed:{seed_number}): " + selected_model)
     sd = StableDiffusion(selected_model)
 
     # Generate the latent vectors using diffusion
@@ -54,8 +77,9 @@ if st.button("Generate"):
         n_images=n_images,
         cfg_weight=cfg,
         num_steps=steps,
+        seed=int(seed_number),
         negative_text=negative_prompt,
-        image_strength=denoising_strength,
+        image_strength=image_strength,
     )
 
     progress_bar = st.progress(0)

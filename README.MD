@@ -25,6 +25,12 @@ What's New
 
 👉 Crude Implementation of Image to Image Generation
 
+👉 I2I UI Cleaned Up
+
+👉 Normalized I2I Base Image Strength Control
+
+👉 Seed Control
+
 Installation
 =============
 

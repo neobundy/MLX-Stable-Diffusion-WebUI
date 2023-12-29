@@ -1,6 +1,5 @@
 # Copyright © 2023 Apple Inc.
 
-import time
 from typing import Tuple
 from PIL import Image
 import numpy as np
@@ -84,13 +83,15 @@ class StableDiffusion:
             cfg_weight: float = 7.5,
             negative_text: str = "",
             latent_size: Tuple[int] = (64, 64),
-            seed=None,
+            seed=-1,
             image_strength=0.7,
     ):
 
         # Set the PRNG state
-        seed = seed or int(time.time())
-        mx.random.seed(seed)
+
+        mx.random.seed(int(seed))
+
+        debug_print(f"Seed: {seed}")
 
         # Tokenize the text
         tokens = [self.tokenizer.tokenize(text)]
@@ -127,12 +128,13 @@ class StableDiffusion:
             latents_list = []
             captions = []
             image_number = 1
+            # Normalize the image_strength to the range [-1, 1]
+            image_strength = 2 * (image_strength - 0.5)
             for _ in range(n_images):
                 # Generate a tensor of random values with the same shape as the latent representation
                 encoder_noise = mx.random.normal(shape=latents.shape, dtype=self.dtype)
-
+                # encoder_noise = mx.random.uniform(low=-1.0, high=1.0, shape=latents.shape, dtype=self.dtype)
                 encoder_noise = normalize_tensor(encoder_noise, (encoder_noise.min(), encoder_noise.max()), (-1, 1))
-
                 encoder_noise *= image_strength
 
                 debug_print(f"Encoder noise (first 50 values): {encoder_noise.flatten()[:50]}")
