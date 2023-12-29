@@ -76,7 +76,8 @@ class TransformerBlock(nn.Module):
         y = self.norm3(x)
         y_a = self.linear1(y)
         y_b = self.linear2(y)
-        y = y_a * nn.gelu_approx(y_b)  # approximate gelu?
+        # y = y_a * nn.gelu_approx(y_b)  # approximate gelu?
+        y = y_a * nn.gelu(y_b) # exact gelu
         y = self.linear3(y)
         x = x + y
 
