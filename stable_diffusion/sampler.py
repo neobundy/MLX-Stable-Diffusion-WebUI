@@ -23,6 +23,7 @@ def _interp(y, x_new):
 
     return y_new
 
+
 class SimpleEulerSampler:
     """A simple Euler integrator that can be used to sample from our diffusion models.
 
@@ -49,8 +50,6 @@ class SimpleEulerSampler:
             [mx.zeros(1), ((1 - alphas_cumprod) / alphas_cumprod).sqrt()]
         )
 
-        self.strength = 0.0
-
     def sample_prior(self, shape, dtype=mx.float32, key=None):
         noise = mx.random.normal(shape, key=key)
         return (
@@ -75,24 +74,34 @@ class SimpleEulerSampler:
 
         return x_t_prev
 
-    def add_noise(self, x, denoising_strength=0.7):
-        """
-        Adds noise to the input image tensor.
 
-        Args:
-        - x (mlx.array): The input image tensor.
-        - denoising_strength (float): The strength of the noise to be added (between 0 and 1).
+    # TODO: Add noise strength to the sampler
+    # def set_noise_strength(self, num_steps: int, noise_strength=1):
+    #     """
+    #     Set how much noise to add to the input image.
+    #     More noise (strength ~ 1) means that the output will be further from the input image.
+    #     Less noise (strength ~ 0) means that the output will be closer to the input image.
+    #     """
+    #     # start_step is the number of noise levels to skip
+    #     start_step = num_steps - int(num_steps * noise_strength)
+    #     self.timesteps = self.timesteps[start_step:]
+    #     self.start_step = start_step
 
-        Returns:
-        - mlx.array: The noisy image tensor.
-        """
-        # Ensuring denoising_strength is within the valid range
-        denoising_strength = max(0, min(denoising_strength, 1))
-
-        # Generating noise
-        noise = mx.random.normal(shape=x.shape, dtype=x.dtype)
-
-        # Adding noise to the image
-        noisy_image = x + noise * denoising_strength
-
-        return noisy_image
+    # TODO: Add noise
+    # def add_noise(self, original_samples, timesteps):
+    #     alphas_cumprod = self._sigmas.square()
+    #     timesteps = mx.array(timesteps)
+    #
+    #     sqrt_alpha_prod = mx.sqrt(alphas_cumprod[timesteps])
+    #     sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+    #     while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
+    #         sqrt_alpha_prod = sqrt_alpha_prod.expand_dims(-1)
+    #
+    #     sqrt_one_minus_alpha_prod = mx.sqrt(1 - alphas_cumprod[timesteps])
+    #     sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+    #     while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
+    #         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.expand_dims(-1)
+    #
+    #     noise = mx.random.normal(0, 1, original_samples.shape)
+    #     noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
+    #     return noisy_samples

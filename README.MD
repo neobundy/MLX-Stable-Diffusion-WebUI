@@ -62,3 +62,10 @@ How to Run
 To run the example, simply type in terminal:
 
     streamlit run ./MLX-Stable-Diffusion-WebUI/main.py
+
+Resources
+=============
+
+Denoising Diffusion Probabilistic Models (DDPM) by Jonathan Ho, Ajay Jain, Pieter Abbeel
+https://arxiv.org/pdf/2006.11239.pdf
+

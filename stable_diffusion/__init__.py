@@ -16,37 +16,12 @@ from .model_io import (
 )
 from .sampler import SimpleEulerSampler
 
-from utils import debug_print
-
+from utils import debug_print, normalize_tensor, tensor_head, visualize_tensor
 
 IMAGE_WIDTH = 512
 IMAGE_HEIGHT = 512
 LATENTS_WIDTH = IMAGE_WIDTH // 8
 LATENTS_HEIGHT = IMAGE_HEIGHT // 8
-
-
-def visualize_tensor(x: mx.array, caption: str = "", normalize:bool = False, placeholder: st.empty = None):
-    # Convert the mlx array to a numpy array
-    x_np = np.array(x.tolist())
-
-    # Normalize or scale the tensor
-    x_np = (x_np - x_np.min()) / (x_np.max() - x_np.min()) if normalize else (x_np + 1) / 2
-
-    # Squeeze the tensor to remove single-dimensional entries from the shape
-    x_np = x_np.squeeze()
-
-    # Display the image with or without a placeholder
-    display_function = placeholder.image if placeholder is not None else st.image
-    display_function(x_np, caption=caption if caption else None)
-
-
-def normalize_tensor(x, old_range, new_range):
-    old_min, old_max = old_range
-    new_min, new_max = new_range
-    x -= old_min
-    x *= (new_max - new_min) / (old_max - old_min)
-    x += new_min
-    return x
 
 
 def _repeat(x, n, axis):
@@ -117,12 +92,12 @@ class StableDiffusion:
             input_image = normalize_tensor(input_image, (input_image.min(), input_image.max()), (-1, 1))
             input_image = mx.expand_dims(input_image, axis=0)
 
-            debug_print(f"Input image before encoding (first 50 values): {input_image.flatten()[:50]}")
+            debug_print(f"Input image before encoding (first 50 values): {tensor_head(input_image, 50)}")
             # Encode the input image to get the latent representation
             latents = self.autoencoder.encode(input_image)
             latents = normalize_tensor(latents, (latents.min(), latents.max()), (-1, 1))
 
-            debug_print(f"Latent after encoding (first 50 values): {latents.flatten()[:50]}")
+            debug_print(f"Latent after encoding (first 50 values): {tensor_head(latents, 50)}")
 
             # Initialize an empty list to store the latents for each image
             latents_list = []
@@ -137,7 +112,7 @@ class StableDiffusion:
                 encoder_noise = normalize_tensor(encoder_noise, (encoder_noise.min(), encoder_noise.max()), (-1, 1))
                 encoder_noise *= image_strength
 
-                debug_print(f"Encoder noise (first 50 values): {encoder_noise.flatten()[:50]}")
+                debug_print(f"Encoder noise (first 50 values): {tensor_head(encoder_noise, 50)}")
 
                 # Add the noise to the latent representation
                 noisy_latents = latents + encoder_noise
@@ -145,7 +120,7 @@ class StableDiffusion:
                 captions.append(f"Input Image {image_number} with Noise")
                 image_number += 1
 
-                debug_print(f"Latents after adding noise (first 50 values): {latents.flatten()[:50]}")
+                debug_print(f"Latents after adding noise (first 50 values): {tensor_head(noisy_latents, 50)}")
 
             # Create columns for the grid
             cols = st.columns(n_images)
@@ -215,4 +190,5 @@ class StableDiffusion:
     def decode(self, x_t):
         x = self.autoencoder.decode(x_t / self.autoencoder.scaling_factor)
         x = mx.minimum(1, mx.maximum(0, x / 2 + 0.5))
+
         return x

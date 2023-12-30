@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 from tqdm import tqdm
+import numpy as np
 import time
 
 import mlx.core as mx
@@ -10,6 +11,9 @@ from stable_diffusion import StableDiffusion
 from stable_diffusion.models import _AVAILABLE_MODELS
 
 from pathlib import Path
+
+from utils import debug_print, normalize_tensor, tensor_head, visualize_tensor
+
 
 _OUTPUT_FOLDER = Path("output")
 _DEFAULT_OUTPUT = "output.png"
@@ -92,7 +96,10 @@ if st.button("Generate"):
     # Decode them into images
     decoded = []
     for i in tqdm(range(0, n_images, decoding_batch_size)):
-        decoded.append(sd.decode(x_t[i : i + decoding_batch_size]))
+        decoded_latents = sd.decode(x_t[i : i + decoding_batch_size])
+        debug_print(f"Decoded latents shape: {decoded_latents.shape}")
+        debug_print(f"Decoded latents: {tensor_head(decoded_latents, 50)}")
+        decoded.append(decoded_latents)
         mx.eval(decoded[-1])
 
     # If n_images is not a multiple of n_rows, pad the decoded list with empty images
@@ -111,6 +118,27 @@ if st.button("Generate"):
     # Save them to disc
     im = Image.fromarray(x.__array__())
     im.save(_OUTPUT_FOLDER / output)
+
+    # Display each image separately
+    # Create a list of columns
+    columns = st.columns(len(decoded))
+
+    # Display each image separately in a column
+    for i, (x, col) in enumerate(zip(decoded, columns)):
+        # Squeeze the array to remove extra dimensions
+        x = mx.squeeze(x)
+        # Scale the pixel values and convert the data type
+        x = (x * 255).astype(mx.uint8)
+
+        # Check if the image is a placeholder (all zeros)
+        if mx.sum(x) == 0:
+            continue
+
+        # Convert the tensor to a numpy array and then to a PIL Image object
+        im = Image.fromarray(x.__array__())
+
+        # Display the image in the column using Streamlit
+        col.image(im, caption=f'Generated Image {i + 1}')
 
 if output:
     try:
