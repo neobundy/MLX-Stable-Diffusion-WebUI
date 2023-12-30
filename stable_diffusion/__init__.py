@@ -5,7 +5,6 @@ from PIL import Image
 import numpy as np
 import mlx.core as mx
 import streamlit as st
-from tqdm import tqdm
 
 from .model_io import (
     load_unet,
@@ -15,7 +14,7 @@ from .model_io import (
     load_tokenizer,
     _DEFAULT_MODEL,
 )
-from .sampler import SimpleEulerSampler, DDPMSampler
+from .sampler import SimpleEulerSampler
 
 from utils import debug_print, normalize_tensor, tensor_head, visualize_tensor, inspect_tensor, get_time_embedding
 
@@ -47,28 +46,16 @@ class StableDiffusion:
         self.unet = load_unet(model, float16)
         self.text_encoder = load_text_encoder(model, float16)
         self.autoencoder = load_autoencoder(model, float16)
-        self.sampler = DDPMSampler(self.diffusion_config)
+        self.sampler = SimpleEulerSampler(self.diffusion_config)
         self.tokenizer = load_tokenizer(model)
 
-    def generate_latents(
-            self,
-            text: str,
-            input_image: Image.Image = None,
-            n_images: int = 1,
-            num_steps: int = 50,
-            cfg_weight: float = 7.5,
-            negative_text: str = "",
-            latent_size: Tuple[int] = (64, 64),
-            seed=-1,
-            image_strength=0.7,
+    def _get_text_conditioning(
+        self,
+        text: str,
+        n_images: int = 1,
+        cfg_weight: float = 7.5,
+        negative_text: str = "",
     ):
-
-        # Set the PRNG state
-
-        mx.random.seed(int(seed))
-
-        debug_print(f"Seed: {seed}")
-
         # Tokenize the text
         tokens = [self.tokenizer.tokenize(text)]
         if cfg_weight > 1:
@@ -85,69 +72,90 @@ class StableDiffusion:
         if n_images > 1:
             conditioning = _repeat(conditioning, n_images, axis=0)
 
-        # Create the latent variables
-        if input_image is not None:
-            # number of values to print from the tensor
-            num_values_to_inspect = 2
+        return conditioning
 
-            # Convert the input image to an mlx array
+    def _denoising_step(self, x_t, t, t_prev, conditioning, cfg_weight: float = 7.5):
+        x_t_unet = mx.concatenate([x_t] * 2, axis=0) if cfg_weight > 1 else x_t
+        t_unet = mx.broadcast_to(t, [len(x_t_unet)])
+        eps_pred = self.unet(x_t_unet, t_unet, encoder_x=conditioning)
+
+        if cfg_weight > 1:
+            eps_text, eps_neg = eps_pred.split(2)
+            eps_pred = eps_neg + cfg_weight * (eps_text - eps_neg)
+
+        x_t_prev = self.sampler.step(eps_pred, x_t, t, t_prev)
+
+        return x_t_prev
+
+    def _denoising_loop(self, x_T, T, conditioning, num_steps: int = 50, cfg_weight: float = 7.5, latent_image_placeholder=None):
+        x_t = x_T
+        for t, t_prev in self.sampler.timesteps(num_steps, start_time=T, dtype=self.dtype):
+            x_t = self._denoising_step(x_t, t, t_prev, conditioning, cfg_weight)
+
+            # Visualize the latent space
+            visualize_tensor(x_t, normalize=True, placeholder=latent_image_placeholder)
+
+            yield x_t
+
+    def generate_latents(
+            self,
+            text: str,
+            input_image: Image.Image = None,
+            n_images: int = 1,
+            num_steps: int = 50,
+            cfg_weight: float = 7.5,
+            negative_text: str = "",
+            latent_size: Tuple[int] = (64, 64),
+            seed=-1,
+            denoising_strength=0.7,
+    ):
+
+        # Set the PRNG state
+
+        mx.random.seed(int(seed))
+
+        debug_print(f"Seed: {seed}")
+
+        # Get the text conditioning
+        conditioning = self._get_text_conditioning(text, n_images, cfg_weight, negative_text)
+
+        if input_image is not None:
+            # Define the num steps and start step
+            start_step = self.sampler.max_time * denoising_strength
+            num_steps = int(num_steps * denoising_strength)
+
+            # Resize the input image
             input_image = input_image.resize((IMAGE_WIDTH, IMAGE_HEIGHT))
             input_image = mx.array(np.array(input_image))
-            input_image = normalize_tensor(input_image, (0, 255), (-1, 1))
-            input_image = mx.expand_dims(input_image, axis=0).astype(self.dtype)
+            input_image = normalize_tensor(input_image.astype(mx.float32), (0, 255), (-1, 1))
 
-            # Encode the input image to get the latent representation
-            latents_shape = (1, 4, LATENTS_HEIGHT, LATENTS_WIDTH)
-            encoder_noise = mx.random.normal(shape=latents_shape, dtype=self.dtype)
-            latents = self.autoencoder.encode(input_image, encoder_noise)
-
-            # Add noise to the latents
-            self.sampler.set_noise_strength(int(image_strength))
-
-            latents = self.sampler.add_noise(latents, self.sampler.timesteps[0])
+            # Get the latents from the input image and add noise according to the
+            # start time.
+            x_0, _ = self.autoencoder.encode(input_image[None])
+            x_0 = mx.broadcast_to(x_0, [n_images] + x_0.shape[1:])
+            x_t = self.sampler.add_noise(x_0, mx.array(start_step))
 
         else:
-            latents = self.sampler.sample_prior(
+            # sample_prior(self, shape, dtype=mx.float32, key=None):
+            x_t = self.sampler.sample_prior(
                 (n_images, *latent_size, self.autoencoder.latent_channels), dtype=self.dtype
             )
 
-            # Visualize the latent space
-            visualize_tensor(latents, normalize=True)
-
-        if input_image is not None:
-            # Unet expects: B, H, W, C = x.shape
-            latents = mx.transpose(latents, (0, 3, 1, 2))
+        # Visualize the latent space
+        st.text("Starting Latent Space")
+        visualize_tensor(x_t, normalize=True)
 
         # Perform the denoising loop
+
         st.text("Denoising Latent Space")
         latent_image_placeholder = st.empty()
 
-        for timesteps, prev_timesteps in self.sampler.get_timesteps(num_steps=num_steps):
-            # (1, 320)
-            # time_embedding = get_time_embedding(timestep)
-            print(f"timesteps: {timesteps}")
-            print(f"prev_timesteps: {prev_timesteps}")
-            model_input = mx.concatenate([latents] * 2, axis=0) if cfg_weight > 1 else latents
+        if input_image is not None:
+            yield from self._denoising_loop(x_t, start_step, conditioning, num_steps, cfg_weight, latent_image_placeholder)
+        else:
+            yield from self._denoising_loop(x_t, self.sampler.max_time, conditioning, num_steps, cfg_weight, latent_image_placeholder)
 
-            # Generate noise prediction
-            # unet(x, timestep, encoder_x, attn_mask=None, encoder_attn_mask=None)
-
-            model_ouput = self.unet(model_input, timestep=timesteps, encoder_x=conditioning)
-
-            if cfg_weight > 1:
-                eps_text, eps_neg = model_ouput.split(2)
-                model_ouput = eps_neg + cfg_weight * (eps_text - eps_neg)
-
-            # Perform the denoising step
-            latents = self.sampler.step(timesteps, model_ouput)
-            model_input = latents
-
-            # Visualize the latent space
-            visualize_tensor(latents, normalize=True, placeholder=latent_image_placeholder)
-            yield latents
-
-    def decode(self, latents):
-        x = self.autoencoder.decode(latents / self.autoencoder.scaling_factor)
+    def decode(self, x_t):
+        x = self.autoencoder.decode(x_t)
         x = mx.minimum(1, mx.maximum(0, x / 2 + 0.5))
-
         return x

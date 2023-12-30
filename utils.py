@@ -24,8 +24,10 @@ def visualize_tensor(x: mx.array, caption: str = "", normalize:bool = False, pla
     # Convert the mlx array to a numpy array
     x_np = np.array(x)
 
+    epsilon = 1e-7  # small constant
+
     # Normalize or scale the tensor
-    x_np = (x_np - x_np.min()) / (x_np.max() - x_np.min()) if normalize else (x_np + 1) / 2
+    x_np = (x_np - x_np.min()) / (x_np.max() - x_np.min() + epsilon) if normalize else (x_np + 1) / 2
 
     # Squeeze the tensor to remove single-dimensional entries from the shape
     x_np = x_np.squeeze()

@@ -23,7 +23,7 @@ What's New
 
     Absolute-reality-1.81
 
-👉 Crude Implementation of Image to Image Generation
+👉 Implementation of Image to Image Generation
 
 👉 I2I UI Cleaned Up
 

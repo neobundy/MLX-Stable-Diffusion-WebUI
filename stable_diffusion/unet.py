@@ -413,7 +413,6 @@ class UNetModel(nn.Module):
         # These encodings are used in transformer models to provide information about the position of the elements in the sequence.
         # The astype(x.dtype) part is ensuring that the positional encoding has the same data type as the input tensor x.
 
-        print(f"timestep: {timestep}")
         temb = self.timesteps(timestep).astype(x.dtype)
         temb = self.time_embedding(temb)
 
