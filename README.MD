@@ -69,3 +69,5 @@ Resources
 Denoising Diffusion Probabilistic Models (DDPM) by Jonathan Ho, Ajay Jain, Pieter Abbeel
 https://arxiv.org/pdf/2006.11239.pdf
 
+Umar Jamil(hkproj) PyTorch Stable Diffusion
+https://github.com/hkproj/pytorch-stable-diffusion
