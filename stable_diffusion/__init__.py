@@ -122,25 +122,24 @@ class StableDiffusion:
         st.text("Denoising Latent Space")
         latent_image_placeholder = st.empty()
 
-        timesteps = tqdm(self.sampler.timesteps)
-
-        for i, timestep in enumerate(timesteps):
+        for timesteps, prev_timesteps in self.sampler.get_timesteps(num_steps=num_steps):
             # (1, 320)
             # time_embedding = get_time_embedding(timestep)
-
+            print(f"timesteps: {timesteps}")
+            print(f"prev_timesteps: {prev_timesteps}")
             model_input = mx.concatenate([latents] * 2, axis=0) if cfg_weight > 1 else latents
 
             # Generate noise prediction
             # unet(x, timestep, encoder_x, attn_mask=None, encoder_attn_mask=None)
 
-            model_ouput = self.unet(model_input, timestep=timestep, encoder_x=conditioning)
+            model_ouput = self.unet(model_input, timestep=timesteps, encoder_x=conditioning)
 
             if cfg_weight > 1:
                 eps_text, eps_neg = model_ouput.split(2)
                 model_ouput = eps_neg + cfg_weight * (eps_text - eps_neg)
 
             # Perform the denoising step
-            latents = self.sampler.step(timestep, model_ouput)
+            latents = self.sampler.step(timesteps, model_ouput)
             model_input = latents
 
             # Visualize the latent space
