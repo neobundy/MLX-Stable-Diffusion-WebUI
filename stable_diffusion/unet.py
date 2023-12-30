@@ -299,6 +299,8 @@ class UNetModel(nn.Module):
             padding=(config.conv_in_kernel - 1) // 2,
         )
 
+        # Generate sinusoidal positional encodings.
+        # These encodings are used in transformer models to provide information about the position of the elements in the sequence.
         self.timesteps = nn.SinusoidalPositionalEncoding(
             config.block_out_channels[0],
             max_freq=1,
@@ -404,7 +406,13 @@ class UNetModel(nn.Module):
 
     def __call__(self, x, timestep, encoder_x, attn_mask=None, encoder_attn_mask=None):
 
-        # Compute the time embeddings
+        # Get the sinusoidal positional encoding for the given timestep.
+        # The self.timesteps object is an instance of the nn.SinusoidalPositionalEncoding class, which generates sinusoidal positional encodings.
+        # These encodings are used in transformer models to provide information about the position of the elements in the sequence.
+        # The astype(x.dtype) part is ensuring that the positional encoding has the same data type as the input tensor x.
+
+        print(f"debug: {timestep}")
+
         temb = self.timesteps(timestep).astype(x.dtype)
         temb = self.time_embedding(temb)
 

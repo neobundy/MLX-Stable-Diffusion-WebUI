@@ -6,6 +6,7 @@ import streamlit as st
 debug = True  # Set this to False if you don't want to print debug messages
 logfile = 'log.txt'
 
+
 def debug_print(*args, **kwargs):
     if debug:
         # Convert the arguments to a string
@@ -17,6 +18,7 @@ def debug_print(*args, **kwargs):
         # Open the log file in append mode and write the message
         with open(logfile, 'a') as f:
             f.write(message + '\n')
+
 
 def visualize_tensor(x: mx.array, caption: str = "", normalize:bool = False, placeholder: st.empty = None):
     # Convert the mlx array to a numpy array
@@ -52,3 +54,17 @@ def inspect_tensor(x, num_values, header=""):
     if header:
         header = f"{header} - "
     debug_print(f"{header}The first {num_values} value(s) of the tensor with shape {x.shape}: {tensor_head(x, num_values)}")
+
+
+def get_time_embedding(timestep):
+    # Calculate the frequencies. The shape of the resulting tensor is (160,).
+    # We use the formula 1 / (10000 ** (i / 160)) for i in range(160).
+    freqs = 1 / (10000 ** (mx.arange(start=0, stop=160, dtype=mx.float32) / 160))
+
+    # Create a tensor with the timestep value and expand its dimensions to match the shape of freqs.
+    # The shape of the resulting tensor is (1, 160).
+    x = mx.array([timestep], dtype=mx.float32).expand_dims(axis=-1) * freqs.expand_dims(axis=0)
+
+    # Concatenate the cosine and sine of x along the last dimension.
+    # The shape of the resulting tensor is (1, 160 * 2).
+    return mx.concatenate(mx.cos(x), mx.sin(x), dim=-1)

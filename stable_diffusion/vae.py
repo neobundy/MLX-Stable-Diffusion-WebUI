@@ -260,7 +260,7 @@ class Autoencoder(nn.Module):
             config.latent_channels_in, config.latent_channels_in
         )
 
-    def encode(self, x):
+    def encode(self, x, noise=None):
         x = self.encoder(x)
 
         # This line applies the linear transformation to the tensor x.
@@ -275,19 +275,29 @@ class Autoencoder(nn.Module):
         # two tensors of size (B, C, H, W) where C = latent_channels_in
         mean, logvar = x.split(2, axis=-1)
 
+        # Clip the log variance to be in the range: 1e-14 and 1e8.
+        logvar = logvar.clip(-30, 20)
+
         # Transforming the noise to match the mean and variance: N(0, 1) -> N(mean, std)
         # x = mean + std * Z where Z ~ N(0, 1)
 
         std = mx.exp(0.5 * logvar)
-        z = mx.random.normal(mean.shape) * std + mean
+        if noise is not None:
+            z = mean + std * noise * mx.random.normal(mean.shape)
+        else:
+            z = mean + std * mx.random.normal(mean.shape)
+        # z = mx.random.normal(mean.shape) * std * noise + mean
+
+        # 0.18215
+        z *= self.scaling_factor
 
         return z
 
     def decode(self, z):
         return self.decoder(self.post_quant_proj(z))
 
-    def __call__(self, x, key=None):
-        z = self.encode(x)
+    def __call__(self, x, noise=None, key=None):
+        z = self.encode(x, noise)
         x_hat = self.decode(z)
 
         return dict(x_hat=x_hat, z=z, mean=mean, logvar=logvar)
