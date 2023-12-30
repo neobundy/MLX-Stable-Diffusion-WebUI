@@ -71,7 +71,13 @@ if st.button("Generate"):
         seed_number = int(time.time())
         st.session_state['seed'] = seed_number
 
-    st.text(f"Generating images using the checkpoint(seed:{seed_number}): " + selected_model)
+    debug_print("====" * 10)
+    # print current date and time to the console
+    session_type = "Text to Image" if input_image is None else "Image to Image"
+    debug_print(f"A New {session_type} Session Started: ", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+    debug_print("====" * 10)
+    st.text(f"{session_type} Session with seed: {seed_number}")
+    st.text("Model: " + selected_model)
     sd = StableDiffusion(selected_model)
 
     # Generate the latent vectors using diffusion
@@ -97,8 +103,6 @@ if st.button("Generate"):
     decoded = []
     for i in tqdm(range(0, n_images, decoding_batch_size)):
         decoded_latents = sd.decode(x_t[i : i + decoding_batch_size])
-        debug_print(f"Decoded latents shape: {decoded_latents.shape}")
-        debug_print(f"Decoded latents: {tensor_head(decoded_latents, 50)}")
         decoded.append(decoded_latents)
         mx.eval(decoded[-1])
 
