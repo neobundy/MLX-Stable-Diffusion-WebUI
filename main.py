@@ -6,9 +6,10 @@ import time
 
 import mlx.core as mx
 
-from stable_diffusion import StableDiffusion
+from stable_diffusion import StableDiffusion, StableDiffusionLocal
 from stable_diffusion.models import _AVAILABLE_MODELS
 from pathlib import Path
+from stable_diffusion.config import PathConfig
 from utils import debug_print, normalize_tensor, tensor_head, visualize_tensor
 
 _OUTPUT_FOLDER = Path("output")
@@ -65,7 +66,8 @@ if st.button("Generate"):
     session_type = "Text to Image" if input_image is None else "Image to Image"
     st.text(f"{session_type} Session with seed: {seed_number}")
     st.text("Model: " + selected_model)
-    sd = StableDiffusion(selected_model)
+    # sd = StableDiffusion(selected_model)
+    sd = StableDiffusionLocal(PathConfig())
 
     # Generate the latent vectors using diffusion
     latents = sd.generate_latents(

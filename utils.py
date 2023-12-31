@@ -4,10 +4,18 @@ import streamlit as st
 
 
 debug = True  # Set this to False if you don't want to print debug messages
-logfile = 'log.txt'
+LOGFILE = 'log.txt'
 
 
-def debug_print(*args, **kwargs):
+def _state_dict(model):
+    """Return the model's state_dict as a dictionary."""
+    state_dict = {}
+    for name, param in model.parameters().items():
+        state_dict[name] = param
+    return state_dict
+
+
+def debug_print(logfile: str = LOGFILE, *args, **kwargs):
     if debug:
         # Convert the arguments to a string
         message = ' '.join(map(str, args))

@@ -6,12 +6,19 @@ import numpy as np
 import mlx.core as mx
 import streamlit as st
 
+from .config import PathConfig
+
 from .model_io import (
     load_unet,
+    load_unet_local,
     load_text_encoder,
+    load_text_encoder_local,
     load_autoencoder,
+    load_autoencoder_local,
     load_diffusion_config,
+    load_diffusion_config_local,
     load_tokenizer,
+    load_tokenizer_local,
     _DEFAULT_MODEL,
 )
 from .sampler import SimpleEulerSampler
@@ -121,3 +128,25 @@ class StableDiffusion:
         """
         x = self.autoencoder.decode(x_t)
         return mx.minimum(1, mx.maximum(0, x / 2 + 0.5))
+
+
+class StableDiffusionLocal(StableDiffusion):
+    """
+    Class for Stable Diffusion model with local paths.
+    """
+    def __init__(self, path_config: PathConfig = PathConfig(), float16: bool = False):
+        """
+        Initialize the StableDiffusion model with the given model and data type.
+
+        float16: Whether to use float16 data type for half-precision.
+        This can reduce the memory requirements of the model by half compared to 32-bit floating point numbers, at the cost of reduced numerical precision.
+
+        """
+        self.dtype = mx.float16 if float16 else mx.float32
+        self.diffusion_config = load_diffusion_config_local(config_path=str(path_config.diffusion_config))
+        self.unet = load_unet_local(config_path=str(path_config.unet_config), weights_path=str(path_config.unet), float16=float16)
+        self.text_encoder = load_text_encoder_local(config_path=str(path_config.text_encoder_config), weights_path=str(path_config.text_encoder), float16=float16)
+        self.autoencoder = load_autoencoder_local(config_path=str(path_config.vae_config), weights_path=str(path_config.vae), float16=float16)
+        self.sampler = SimpleEulerSampler(self.diffusion_config)
+        self.tokenizer = load_tokenizer_local(vocab_path=str(path_config.tokenizer_vocab), merges_path=str(path_config.tokenizer_merges))
+

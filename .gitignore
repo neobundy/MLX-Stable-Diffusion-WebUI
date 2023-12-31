@@ -1,4 +1,9 @@
 /output/
 /resources
 /models
+/text_encoder
+/vae
+/scheduler
+/tokenizer
+/unet
 log.txt
