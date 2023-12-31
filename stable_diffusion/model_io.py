@@ -17,43 +17,75 @@ from .vae import Autoencoder
 
 from .models import _DEFAULT_MODEL, _MODELS
 
+logfile = 'log.txt'
+__DEBUG = True
+
+
+def _debug_print(*args, **kwargs):
+    if __DEBUG:
+        # Convert the arguments to a string
+        message = ' '.join(map(str, args))
+
+        # Print the message to the console
+        print(message, **kwargs)
+
+        # Open the log file in append mode and write the message
+        with open(logfile, 'a') as f:
+            f.write(message + '\n')
+
 
 def _from_numpy(x):
     return mx.array(np.ascontiguousarray(x))
 
 
+# The `map_*_weights` functions are used to adjust the weights of a model when loading it from a file.
+# The weights of the model in the file might be in a different format than the weights of the model in the current codebase.
+# When you load a pre-trained model, the weights are stored in a dictionary where the keys are the names of the parameters in the model.
+# If the architecture of your model is different from the architecture of the model that the weights were trained on, you might need to adjust the keys and/or the weights to match your model's architecture.
+# This is what the `map_*_weights` functions are doing. They are adjusting the keys and the weights to match the architecture of the models in the current codebase.
 def map_unet_weights(key, value):
     # Map up/downsampling
     if "downsamplers" in key:
         key = key.replace("downsamplers.0.conv", "downsample")
+        _debug_print(f"Replaced 'downsamplers.0.conv' with 'downsample' in {key}")
     if "upsamplers" in key:
         key = key.replace("upsamplers.0.conv", "upsample")
+        _debug_print(f"Replaced 'upsamplers.0.conv' with 'upsample' in {key}")
 
     # Map the mid block
     if "mid_block.resnets.0" in key:
         key = key.replace("mid_block.resnets.0", "mid_blocks.0")
+        _debug_print(f"Replaced 'mid_block.resnets.0' with 'mid_blocks.0' in {key}")
     if "mid_block.attentions.0" in key:
         key = key.replace("mid_block.attentions.0", "mid_blocks.1")
+        _debug_print(f"Replaced 'mid_block.attentions.0' with 'mid_blocks.1' in {key}")
     if "mid_block.resnets.1" in key:
         key = key.replace("mid_block.resnets.1", "mid_blocks.2")
+        _debug_print(f"Replaced 'mid_block.resnets.1' with 'mid_blocks.2' in {key}")
 
     # Map attention layers
     if "to_k" in key:
         key = key.replace("to_k", "key_proj")
+        _debug_print(f"Replaced 'to_k' with 'key_proj' in {key}")
     if "to_out.0" in key:
         key = key.replace("to_out.0", "out_proj")
+        _debug_print(f"Replaced 'to_out.0' with 'out_proj' in {key}")
     if "to_q" in key:
         key = key.replace("to_q", "query_proj")
+        _debug_print(f"Replaced 'to_q' with 'query_proj' in {key}")
     if "to_v" in key:
         key = key.replace("to_v", "value_proj")
+        _debug_print(f"Replaced 'to_v' with 'value_proj' in {key}")
 
     # Map transformer ffn
     if "ff.net.2" in key:
         key = key.replace("ff.net.2", "linear3")
+        _debug_print(f"Replaced 'ff.net.2' with 'linear3' in {key}")
     if "ff.net.0" in key:
         k1 = key.replace("ff.net.0.proj", "linear1")
         k2 = key.replace("ff.net.0.proj", "linear2")
         v1, v2 = np.split(value, 2)
+        _debug_print(f"Replaced 'ff.net.0.proj' with 'linear1' and 'linear2' in {key}")
 
         return [(k1, _from_numpy(v1)), (k2, _from_numpy(v2))]
 
@@ -66,13 +98,16 @@ def map_unet_weights(key, value):
 
     if "conv_shortcut.weight" in key:
         value = value.squeeze()
+        _debug_print(f"Squeezed 'conv_shortcut.weight' in {key}")
 
     # Transform the weights from 1x1 convs to linear
     if len(value.shape) == 4 and ("proj_in" in key or "proj_out" in key):
         value = value.squeeze()
+        _debug_print(f"Squeezed 'proj_in' or 'proj_out' in {key}")
 
     if len(value.shape) == 4:
         value = value.transpose(0, 2, 3, 1)
+        _debug_print(f"Transposed dimensions in {key}")
 
     return [(key, _from_numpy(value))]
 
@@ -81,26 +116,35 @@ def map_clip_text_encoder_weights(key, value):
     # Remove prefixes
     if key.startswith("text_model."):
         key = key[11:]
+        _debug_print(f"Removed 'text_model.' prefix from {key}")
     if key.startswith("embeddings."):
         key = key[11:]
+        _debug_print(f"Removed 'embeddings.' prefix from {key}")
     if key.startswith("encoder."):
         key = key[8:]
+        _debug_print(f"Removed 'encoder.' prefix from {key}")
 
     # Map attention layers
     if "self_attn." in key:
         key = key.replace("self_attn.", "attention.")
+        _debug_print(f"Replaced 'self_attn.' with 'attention.' in {key}")
     if "q_proj." in key:
         key = key.replace("q_proj.", "query_proj.")
+        _debug_print(f"Replaced 'q_proj.' with 'query_proj.' in {key}")
     if "k_proj." in key:
         key = key.replace("k_proj.", "key_proj.")
+        _debug_print(f"Replaced 'k_proj.' with 'key_proj.' in {key}")
     if "v_proj." in key:
         key = key.replace("v_proj.", "value_proj.")
+        _debug_print(f"Replaced 'v_proj.' with 'value_proj.' in {key}")
 
     # Map ffn layers
     if "mlp.fc1" in key:
         key = key.replace("mlp.fc1", "linear1")
+        _debug_print(f"Replaced 'mlp.fc1' with 'linear1' in {key}")
     if "mlp.fc2" in key:
         key = key.replace("mlp.fc2", "linear2")
+        _debug_print(f"Replaced 'mlp.fc2' with 'linear2' in {key}")
 
     return [(key, _from_numpy(value))]
 
@@ -109,39 +153,51 @@ def map_vae_weights(key, value):
     # Map up/downsampling
     if "downsamplers" in key:
         key = key.replace("downsamplers.0.conv", "downsample")
+        _debug_print(f"Replaced 'downsamplers.0.conv' with 'downsample' in {key}")
     if "upsamplers" in key:
         key = key.replace("upsamplers.0.conv", "upsample")
+        _debug_print(f"Replaced 'upsamplers.0.conv' with 'upsample' in {key}")
 
     # Map attention layers
     if "to_k" in key:
         key = key.replace("to_k", "key_proj")
+        _debug_print(f"Replaced 'to_k' with 'key_proj' in {key}")
     if "to_out.0" in key:
         key = key.replace("to_out.0", "out_proj")
+        _debug_print(f"Replaced 'to_out.0' with 'out_proj' in {key}")
     if "to_q" in key:
         key = key.replace("to_q", "query_proj")
+        _debug_print(f"Replaced 'to_q' with 'query_proj' in {key}")
     if "to_v" in key:
         key = key.replace("to_v", "value_proj")
+        _debug_print(f"Replaced 'to_v' with 'value_proj' in {key}")
 
     # Map the mid block
     if "mid_block.resnets.0" in key:
         key = key.replace("mid_block.resnets.0", "mid_blocks.0")
+        _debug_print(f"Replaced 'mid_block.resnets.0' with 'mid_blocks.0' in {key}")
     if "mid_block.attentions.0" in key:
         key = key.replace("mid_block.attentions.0", "mid_blocks.1")
+        _debug_print(f"Replaced 'mid_block.attentions.0' with 'mid_blocks.1' in {key}")
     if "mid_block.resnets.1" in key:
         key = key.replace("mid_block.resnets.1", "mid_blocks.2")
+        _debug_print(f"Replaced 'mid_block.resnets.1' with 'mid_blocks.2' in {key}")
 
     # Map the quant/post_quant layers
     if "quant_conv" in key:
         key = key.replace("quant_conv", "quant_proj")
         value = value.squeeze()
+        _debug_print(f"Replaced 'quant_conv' with 'quant_proj' and squeezed value in {key}")
 
     # Map the conv_shortcut to linear
     if "conv_shortcut.weight" in key:
         value = value.squeeze()
+        _debug_print(f"Squeezed 'conv_shortcut.weight' in {key}")
 
     # Rearrange the dimensions to [B, H, W, C] - Autoencoder expects: B, H, W, C = x.shape
     if len(value.shape) == 4:
         value = value.transpose(0, 2, 3, 1)
+        _debug_print(f"Transposed dimensions in {key}")
 
     return [(key, _from_numpy(value))]
 
@@ -150,6 +206,8 @@ def _flatten(params):
     return [(k, v) for p in params for (k, v) in p]
 
 
+# The weights of the model can be loaded as 16-bit floating point numbers, which is a form of quantization known as half-precision floating point.
+# This can reduce the memory requirements of the model by half compared to 32-bit floating point numbers, at the cost of reduced numerical precision.
 def _load_safetensor_weights(mapper, model, weight_file, float16: bool = False):
     dtype = np.float16 if float16 else np.float32
     with safetensor_open(weight_file, framework="numpy") as f:
