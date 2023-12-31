@@ -6,4 +6,5 @@
 /scheduler
 /tokenizer
 /unet
+/diffuser_models
 log.txt

@@ -15,13 +15,15 @@ What's New
 
 👉 Streamlit WebUI
 
-👉 Models: 
-  
-    Stable-diffusion-2-1-base
+👉 All models from Hugging Face can be used
 
-    Dreamshaper-8
+👉 All SD 1.5 Models that can be converted to diffuser models are supported
 
-    Absolute-reality-1.81
+    When you select a non-diffuser model from the list, the model will be converted to a diffuser model and saved in the `diffuser_models` folder. 
+ 
+    The next time you run the code, the converted model will be used.
+
+    Please note that the conversion process may take a while.
 
 👉 Implementation of Image to Image Generation
 
@@ -30,6 +32,8 @@ What's New
 👉 Normalized I2I Base Image Strength Control
 
 👉 Seed Control
+
+👉 Half Precision Support
 
 Installation
 =============
@@ -56,6 +60,20 @@ To add a new model, you need to add a new entry to the _AVAILABLE_MODELS list in
     ]
 
 Added models will be available in the dropdown menu in the web interface automatically. XL models are not supported. 
+
+
+How to Add Local Models
+===================================
+
+Just symlink your Automatic1111 Stable Diffusion models folder to the `models` folder. 
+
+    ln -s /path/to/your/automatic1111/stable_diffusion/models_folder ./models
+
+    ex) ln -s ~/stable-diffusion-webui/models/Stable-diffusion ./models
+
+Note that all SDXL models are excluded based on their file names and not checked for compatibility.
+
+You original unconverted models will remain intact. Converted models will be saved in the `diffuser_models` folder.
 
 How to Run
 =============

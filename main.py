@@ -3,18 +3,26 @@ from PIL import Image
 from tqdm import tqdm
 import numpy as np
 import time
-
+import os
 import mlx.core as mx
 
 from stable_diffusion import StableDiffusion, StableDiffusionLocal
 from stable_diffusion.models import _AVAILABLE_MODELS
 from pathlib import Path
-from stable_diffusion.config import PathConfig
-from utils import debug_print, normalize_tensor, tensor_head, visualize_tensor
+from stable_diffusion.config import DiffuserModelPathConfig
+from utils import debug_print, normalize_tensor, tensor_head, visualize_tensor, run_conversion_script
+
+diffuser_models = DiffuserModelPathConfig()
 
 _OUTPUT_FOLDER = Path("output")
 _DEFAULT_OUTPUT = "output.png"
 _OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+SAFETENSORS_MODELS_FOLDER = "./models"
+DIFFUSER_MODELS_FOLDER = diffuser_models.model_path
+
+# Get a list of all files in the SAFETENSORS_MODELS_FOLDER directory with the 'safetensors' extension
+model_files = [f for f in os.listdir(SAFETENSORS_MODELS_FOLDER) if f.endswith('.safetensors') and 'XL' not in f]
+model_files.sort()
 
 _THUMB = "thumb.jpeg"
 
@@ -25,7 +33,22 @@ REPO_URL = "https://github.com/neobundy/MLX-Stable-Diffusion-WebUI"
 WHOAMI = "https://x.com/WankyuChoi"
 
 # Sidebar options
-selected_model = st.sidebar.selectbox('Select a model', _AVAILABLE_MODELS, index=0)
+# Create a dropdown list with the model files
+USE_HUGGINGFACE = st.sidebar.checkbox('USE HUGGINGFACE', value=False)
+
+if USE_HUGGINGFACE:
+    selected_model = st.sidebar.selectbox('Select a model', _AVAILABLE_MODELS, index=0)
+else:
+    selected_model = st.sidebar.selectbox('Select a model', model_files, index=0)
+    selected_model_without_extension = os.path.splitext(selected_model)[0]
+
+    selected_diffuser_model = f"{DIFFUSER_MODELS_FOLDER}/{selected_model_without_extension}"
+    if not os.path.exists(selected_diffuser_model):
+        st.info("Converting model to diffuser format: " + selected_model)
+        run_conversion_script(f"{SAFETENSORS_MODELS_FOLDER}/{selected_model}", selected_diffuser_model)
+
+    selected_model = selected_diffuser_model
+
 st.sidebar.title("Options")
 uploaded_file = st.sidebar.file_uploader("Choose an image for I2I", type=["jpg", "jpeg", "png"])
 denoising_strength = st.sidebar.slider("Denoising Strength", min_value=0.1, max_value=1.0, value=0.7)
@@ -66,8 +89,11 @@ if st.button("Generate"):
     session_type = "Text to Image" if input_image is None else "Image to Image"
     st.text(f"{session_type} Session with seed: {seed_number}")
     st.text("Model: " + selected_model)
-    # sd = StableDiffusion(selected_model)
-    sd = StableDiffusionLocal(PathConfig())
+
+    if USE_HUGGINGFACE:
+        sd = StableDiffusion(selected_model)
+    else:
+        sd = StableDiffusionLocal(diffuser_model_path=selected_model)
 
     # Generate the latent vectors using diffusion
     latents = sd.generate_latents(

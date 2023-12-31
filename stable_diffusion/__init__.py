@@ -6,20 +6,16 @@ import numpy as np
 import mlx.core as mx
 import streamlit as st
 
-from .config import PathConfig
+from .config import DiffuserModelPathConfig
 
 from .model_io import (
     load_unet,
-    load_unet_local,
     load_text_encoder,
-    load_text_encoder_local,
     load_autoencoder,
-    load_autoencoder_local,
     load_diffusion_config,
-    load_diffusion_config_local,
     load_tokenizer,
-    load_tokenizer_local,
     _DEFAULT_MODEL,
+    load_diffuser_model
 )
 from .sampler import SimpleEulerSampler
 
@@ -30,6 +26,9 @@ IMAGE_WIDTH = 512
 IMAGE_HEIGHT = 512
 LATENTS_WIDTH = IMAGE_WIDTH // 8
 LATENTS_HEIGHT = IMAGE_HEIGHT // 8
+LOGFILE = "log.txt"
+
+diffuser_models = DiffuserModelPathConfig()
 
 
 def _repeat(x, n, axis):
@@ -56,6 +55,10 @@ class StableDiffusion:
         This can reduce the memory requirements of the model by half compared to 32-bit floating point numbers, at the cost of reduced numerical precision.
 
         """
+
+        debug_print(f"Using Huggingface model: {model}")
+
+
         self.dtype = mx.float16 if float16 else mx.float32
         self.diffusion_config = load_diffusion_config(model)
         self.unet = load_unet(model, float16)
@@ -134,7 +137,7 @@ class StableDiffusionLocal(StableDiffusion):
     """
     Class for Stable Diffusion model with local paths.
     """
-    def __init__(self, path_config: PathConfig = PathConfig(), float16: bool = False):
+    def __init__(self, diffuser_model_path : str, float16: bool = False):
         """
         Initialize the StableDiffusion model with the given model and data type.
 
@@ -142,11 +145,16 @@ class StableDiffusionLocal(StableDiffusion):
         This can reduce the memory requirements of the model by half compared to 32-bit floating point numbers, at the cost of reduced numerical precision.
 
         """
-        self.dtype = mx.float16 if float16 else mx.float32
-        self.diffusion_config = load_diffusion_config_local(config_path=str(path_config.diffusion_config))
-        self.unet = load_unet_local(config_path=str(path_config.unet_config), weights_path=str(path_config.unet), float16=float16)
-        self.text_encoder = load_text_encoder_local(config_path=str(path_config.text_encoder_config), weights_path=str(path_config.text_encoder), float16=float16)
-        self.autoencoder = load_autoencoder_local(config_path=str(path_config.vae_config), weights_path=str(path_config.vae), float16=float16)
-        self.sampler = SimpleEulerSampler(self.diffusion_config)
-        self.tokenizer = load_tokenizer_local(vocab_path=str(path_config.tokenizer_vocab), merges_path=str(path_config.tokenizer_merges))
 
+        debug_print(f"Using local diffuser model: {diffuser_model_path}")
+
+
+        models = load_diffuser_model(diffuser_model_path, float16=float16)
+
+        self.dtype = mx.float16 if float16 else mx.float32
+        self.diffusion_config = models["diffusion_config"]
+        self.unet = models["unet"]
+        self.text_encoder = models["text_encoder"]
+        self.autoencoder = models["autoencoder"]
+        self.tokenizer = models["tokenizer"]
+        self.sampler = SimpleEulerSampler(self.diffusion_config)

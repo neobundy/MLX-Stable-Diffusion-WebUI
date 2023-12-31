@@ -6,3 +6,5 @@ numpy
 tqdm
 Pillow
 streamlit
+diffusers
+omegaconf

@@ -17,15 +17,16 @@ from .unet import UNetModel
 from .vae import Autoencoder
 
 from .models import _DEFAULT_MODEL, _MODELS
+from .config import DiffuserModelPathConfig
 
-from utils import _state_dict
+from tqdm import tqdm
 
 logfile = 'log.txt'
-__DEBUG = True
+_DEBUG = False
 
 
 def _debug_print(*args, **kwargs):
-    if __DEBUG:
+    if _DEBUG:
         # Convert the arguments to a string
         message = ' '.join(map(str, args))
 
@@ -213,14 +214,12 @@ def _flatten(params):
 # This can reduce the memory requirements of the model by half compared to 32-bit floating point numbers, at the cost of reduced numerical precision.
 def _load_safetensor_weights(mapper, model, weight_file, float16: bool = False):
     dtype = np.float16 if float16 else np.float32
+
+    _debug_print(f"Loading weights from {weight_file}")
+
     with safetensor_open(weight_file, framework="numpy") as f:
-        weights = _flatten([mapper(k, f.get_tensor(k).astype(dtype)) for k in f.keys()])
-    model.update(tree_unflatten(weights))
-
-
-def _load_safetensor_weights_local(mapper, model, weights, float16: bool = False):
-    dtype = np.float16 if float16 else np.float32
-    weights = _flatten([mapper(k, weights[k].astype(dtype)) for k in weights.keys()])
+        keys = list(f.keys())
+        weights = _flatten([mapper(k, f.get_tensor(k).astype(dtype)) for k in tqdm(keys, desc=f"Loading weights from {weight_file}...")])
     model.update(tree_unflatten(weights))
 
 
@@ -351,11 +350,21 @@ def load_tokenizer(key: str = _DEFAULT_MODEL):
     return Tokenizer(bpe_ranks, vocab)
 
 
-def load_unet_local(config_path: str, weights_path: str, float16: bool = False):
+def load_unet_local(weights_path: str, config_path: str, float16: bool = False):
     """Load the stable diffusion UNet from local files."""
 
-    with open(config_path) as f:
-        config = json.load(f)
+    if config_path is None:
+        # Download the default config
+        key = _DEFAULT_MODEL
+        _check_key(key, "load_unet")
+        unet_config = _MODELS[key]["unet_config"]
+        _debug_print("Unet: Using default config - {unet_config}")
+        with open(hf_hub_download(key, unet_config)) as f:
+            config = json.load(f)
+    else:
+        _debug_print(f"Unet: Using config - {config_path}")
+        with open(config_path) as f:
+            config = json.load(f)
 
     n_blocks = len(config["block_out_channels"])
     model = UNetModel(
@@ -375,47 +384,59 @@ def load_unet_local(config_path: str, weights_path: str, float16: bool = False):
     # Load the weights into the model
     _load_safetensor_weights(map_unet_weights, model, weights_path, float16)
 
-    # Extract the weights for the UNet model
-    unet_weights = {k: v for k, v in model.items() if k.startswith('unet')}
-
     return model
 
 
-def load_text_encoder_local(weights_path: str, config_path: Optional[str] = None, float16: bool = False):
+def load_text_encoder_local(weights_path: str, config_path: str, float16: bool = False):
     """Load the stable diffusion text encoder from local files."""
-    if config_path is not None:
-        # Load the config from the file and create the model
+
+    if config_path is None:
+        # Download the default config
+        key = _DEFAULT_MODEL
+        _check_key(key, "load_text_encoder")
+        text_encoder_config = _MODELS[key]["text_encoder_config"]
+        _debug_print("Text Encoder: Using default config - {text_encoder_config}")
+        with open(hf_hub_download(key, text_encoder_config)) as f:
+            config = json.load(f)
+    else:
+        _debug_print(f"Text Encoder: Using config - {config_path}")
         with open(config_path) as f:
             config = json.load(f)
-        model_config = CLIPTextModelConfig(
+
+    model = CLIPTextModel(
+        CLIPTextModelConfig(
             num_layers=config["num_hidden_layers"],
             model_dims=config["hidden_size"],
             num_heads=config["num_attention_heads"],
             max_length=config["max_position_embeddings"],
             vocab_size=config["vocab_size"],
         )
-    else:
-        # Use the default config
-        model_config = CLIPTextModelConfig()
-
-    model = CLIPTextModel(model_config)
+    )
 
     # Load the weights into the model
     _load_safetensor_weights(map_clip_text_encoder_weights, model, weights_path, float16)
 
-    # Extract the weights for the text encoder model
-    text_encoder_weights = {k: v for k, v in model.items() if k.startswith('text_encoder')}
-
     return model
 
 
-def load_autoencoder_local(weights_path: str, config_path: Optional[str] = None, float16: bool = False):
+def load_autoencoder_local(weights_path: str, config_path: str, float16: bool = False):
     """Load the stable diffusion autoencoder from local files."""
-    if config_path is not None:
-        # Load the config from the file and create the model
+
+    if config_path is None:
+        # Download the default config
+        key = _DEFAULT_MODEL
+        _check_key(key, "load_autoencoder")
+        vae_config = _MODELS[key]["vae_config"]
+        _debug_print("Autoencoder: Using default config - {vae_config}")
+        with open(hf_hub_download(key, vae_config)) as f:
+            config = json.load(f)
+    else:
+        _debug_print(f"Autoencoder: Using config - {config_path}")
         with open(config_path) as f:
             config = json.load(f)
-        model_config = AutoencoderConfig(
+
+    model = Autoencoder(
+        AutoencoderConfig(
             in_channels=config["in_channels"],
             out_channels=config["out_channels"],
             latent_channels_out=2 * config["latent_channels"],
@@ -424,25 +445,17 @@ def load_autoencoder_local(weights_path: str, config_path: Optional[str] = None,
             layers_per_block=config["layers_per_block"],
             norm_num_groups=config["norm_num_groups"],
         )
-    else:
-        # Use the default config
-        model_config = AutoencoderConfig()
-
-    model = Autoencoder(model_config)
+    )
 
     # Load the weights into the model
     _load_safetensor_weights(map_vae_weights, model, weights_path, float16)
 
-    # Extract the weights for the autoencoder model
-    autoencoder_weights = {k: v for k, v in model.items() if k.startswith('autoencoder')}
-
     return model
 
 
-def load_diffusion_config_local(config_path: str):
-    """Load the stable diffusion config from a local file."""
+def load_diffusion_config_local(config_path:str):
 
-    with open(config_path) as f:
+    with open(config_path, "r") as f:
         config = json.load(f)
 
     return DiffusionConfig(
@@ -453,14 +466,31 @@ def load_diffusion_config_local(config_path: str):
     )
 
 
-def load_tokenizer_local(vocab_file: str, merges_file: str):
-    """Load the stable diffusion tokenizer from local files."""
-    with open(vocab_file, encoding="utf-8") as f:
+def load_tokenizer_local(vocab_path: str, merges_path: str):
+
+    with open(vocab_path, encoding="utf-8") as f:
         vocab = json.load(f)
 
-    with open(merges_file, encoding="utf-8") as f:
+    with open(merges_path, encoding="utf-8") as f:
         bpe_merges = f.read().strip().split("\n")[1 : 49152 - 256 - 2 + 1]
     bpe_merges = [tuple(m.split()) for m in bpe_merges]
     bpe_ranks = dict(map(reversed, enumerate(bpe_merges)))
 
     return Tokenizer(bpe_ranks, vocab)
+
+def load_diffuser_model(diffuser_model_path: str, float16: bool = False):
+    # ./unet/models/model_path
+
+    _debug_print(f"Loading diffuser model from {diffuser_model_path}")
+    diffuser_model = DiffuserModelPathConfig(model_path=diffuser_model_path)
+    unet = load_unet_local(diffuser_model.unet, diffuser_model.unet_config, float16)
+    text_encoder = load_text_encoder_local(diffuser_model.text_encoder, diffuser_model.text_encoder_config, float16)
+    autoencoder = load_autoencoder_local(diffuser_model.vae, diffuser_model.vae_config, float16)
+    diffusion_config = load_diffusion_config_local(diffuser_model.diffusion_config)
+    tokenizer = load_tokenizer_local(diffuser_model.tokenizer_vocab, diffuser_model.tokenizer_merges)
+
+    return { "unet": unet,
+             "text_encoder": text_encoder,
+             "autoencoder": autoencoder,
+             "diffusion_config": diffusion_config,
+             "tokenizer": tokenizer }

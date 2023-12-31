@@ -1,10 +1,23 @@
 import numpy as np
 import mlx.core as mx
 import streamlit as st
-
+from safetensors import safe_open as safetensor_open
+from pathlib import Path
+import shutil
 
 debug = True  # Set this to False if you don't want to print debug messages
 LOGFILE = 'log.txt'
+
+
+def get_state_dict_from_safetensor(checkpoint_path: str):
+    """Return the state_dict from the checkpoint."""
+    state_dict = {}
+    with safetensor_open(checkpoint_path, framework="numpy") as f:
+        # Access the data in the file
+        for key in f.keys():
+            tensor = f.get_tensor(key)
+            state_dict[key] = tensor
+    return state_dict
 
 
 def _state_dict(model):
@@ -15,17 +28,13 @@ def _state_dict(model):
     return state_dict
 
 
-def debug_print(logfile: str = LOGFILE, *args, **kwargs):
+def debug_print(*args, **kwargs):
     if debug:
         # Convert the arguments to a string
         message = ' '.join(map(str, args))
 
         # Print the message to the console
         print(message, **kwargs)
-
-        # Open the log file in append mode and write the message
-        with open(logfile, 'a') as f:
-            f.write(message + '\n')
 
 
 def visualize_tensor(x: mx.array, caption: str = "", normalize:bool = False, placeholder: st.empty = None):
@@ -78,3 +87,25 @@ def get_time_embedding(timestep):
     # Concatenate the cosine and sine of x along the last dimension.
     # The shape of the resulting tensor is (1, 160 * 2).
     return mx.concatenate(mx.cos(x), mx.sin(x), dim=-1)
+
+
+import subprocess
+
+
+def run_conversion_script(old_checkpoint_path: str, new_checkpoint_path: str):
+
+    """Delete the directory if it exists."""
+    new_checkpoint_path = Path(new_checkpoint_path)
+    if new_checkpoint_path.exists() and new_checkpoint_path.is_dir():
+        shutil.rmtree(new_checkpoint_path)
+
+    command = [
+        "python",
+        "./convert_original_stable_diffusion_to_diffusers.py",
+        "--checkpoint_path", f"{old_checkpoint_path}",
+        "--from_safetensors",
+        "--to_safetensors",
+        "--dump_path", f"{new_checkpoint_path}"
+    ]
+    subprocess.run(command)
+

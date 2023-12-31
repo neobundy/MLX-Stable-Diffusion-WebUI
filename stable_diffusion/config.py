@@ -2,6 +2,51 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 from pathlib import Path
 
+
+class DiffuserModelPathConfig:
+    def __init__(self, model_path: str = "./diffuser_models"):
+        self.model_path = model_path
+
+    @property
+    def unet_config(self):
+        return self.model_path + "/unet/config.json"
+
+    @property
+    def unet(self):
+        return self.model_path + "/unet/diffusion_pytorch_model.safetensors"
+
+    @property
+    def scheduler(self):
+        return self.model_path + "/scheduler/scheduler_config.json"
+
+    @property
+    def text_encoder_config(self):
+        return self.model_path + "/text_encoder/config.json"
+
+    @property
+    def text_encoder(self):
+        return self.model_path + "/text_encoder/model.safetensors"
+
+    @property
+    def vae_config(self):
+        return self.model_path + "/vae/config.json"
+
+    @property
+    def vae(self):
+        return self.model_path + "/vae/diffusion_pytorch_model.safetensors"
+
+    @property
+    def diffusion_config(self):
+        return self.model_path + "/scheduler/scheduler_config.json"
+
+    @property
+    def tokenizer_vocab(self):
+        return self.model_path + "/tokenizer/vocab.json"
+
+    @property
+    def tokenizer_merges(self):
+        return self.model_path + "/tokenizer/merges.txt"
+
 @dataclass
 class BaseConfig:
     def __getitem__(self, key):
@@ -10,18 +55,6 @@ class BaseConfig:
     def __setitem__(self, key, value):
         self.__dict__[key] = value
 
-@dataclass
-class PathConfig(BaseConfig):
-    model: Path = Path("models")
-    unet_config: Path = Path("unet/config.json")
-    unet: Path = Path("unet/diffusion_pytorch_model.safetensors")
-    text_encoder_config: Path = Path("text_encoder/config.json")
-    text_encoder: Path = Path("text_encoder/model.safetensors")
-    vae_config: Path = Path("vae/config.json")
-    vae: Path = Path("vae/diffusion_pytorch_model.safetensors")
-    diffusion_config: Path = Path("scheduler/scheduler_config.json")
-    tokenizer_vocab: Path = Path("tokenizer/vocab.json")
-    tokenizer_merges: Path = Path("tokenizer/merges.txt")
 
 @dataclass
 class AutoencoderConfig(BaseConfig):
