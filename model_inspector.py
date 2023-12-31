@@ -63,8 +63,6 @@ def inspect_model(path_config: PathConfig, keys_only=True):
     write_to_file("-" * 50)
     write_to_file(f"Tokenizer Vocab{NUM_ITEMS}:", list(tokenizer.vocab.items())[:NUM_ITEMS])
 
-    # TODO: inspect the model to see if it has modules baked in
-
 
 if __name__ == "__main__":
     write_to_file("-" * 50)
