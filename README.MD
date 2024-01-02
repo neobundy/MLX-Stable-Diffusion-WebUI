@@ -89,3 +89,9 @@ https://arxiv.org/pdf/2006.11239.pdf
 
 Umar Jamil(hkproj) PyTorch Stable Diffusion
 https://github.com/hkproj/pytorch-stable-diffusion
+
+Notes on Contributions
+=======================
+While I deeply appreciate the community's interest and support, this project is currently not open for external contributions. As the sole author, I am crafting the content meticulously to ensure the highest quality and consistency in the educational material provided. This approach helps maintain the integrity and coherence of the content, tailored specifically for this project's unique educational goals.
+
+I encourage you to use this resource for your learning and hope it helps you in your AI journey. Thank you for understanding and respecting the nature of this project.
