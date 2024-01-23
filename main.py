@@ -134,7 +134,7 @@ if st.button("Generate"):
         x = (x * 255).astype(mx.uint8)
 
         # Save them to disc
-        im = Image.fromarray(x.__array__())
+        im = Image.fromarray(np.asarray(x))
         im.save(_OUTPUT_FOLDER / output)
 
         # Display each image separately
@@ -142,7 +142,7 @@ if st.button("Generate"):
         for i, (x, col) in enumerate(zip(decoded, columns)):
             x = mx.squeeze(x)
             x = (x * 255).astype(mx.uint8)
-            im = Image.fromarray(x.__array__())
+            im = Image.fromarray(np.asarray(x))
             col.image(im, caption=f'Generated Image {i + 1}')
 
     if output:
