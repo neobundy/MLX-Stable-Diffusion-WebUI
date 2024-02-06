@@ -111,7 +111,6 @@ if st.button("Generate"):
     total_steps = int(steps * denoising_strength) if input_image is not None else steps
     x_t = None
     for i, x_t in enumerate(tqdm(latents, total=total_steps)):
-        mx.simplify(x_t)
         mx.eval(x_t)
         progress_bar.progress((i + 1) / total_steps)
 
