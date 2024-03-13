@@ -22,7 +22,7 @@ Given the rarity of reported cases, I'm not optimistic about a resolution, if an
 
 I simply can't invest myself in anything that causes me more headaches than joy. Furthermore, I can't recommend using MLX in production environments, especially if you're working with high-end machines. 
 
-For these reasons, with heavy hearts, I've decided to stop working on MLX projects in this repository. The book and other contents I've already written will remain, but I won't be adding any new MLX-related content. And for most of you, that would more than suffice.
+For these reasons, with heavy hearts, I've decided to stop working on all MLX projects on GitHub.
 
 Despite everything, I remain deeply appreciative of the effort and commitment demonstrated by the MLX team and the community. My best wishes are with all of you. It seems I'm the only one who needs to take a step back from this journey. 
 
