@@ -1,3 +1,9 @@
+Notes on Future Development
+====================================
+Due to serious Metal bugs, at least for me, that can't be managed, I won't be actively working on this project anymore. Feel free to explore on your own.
+
+For more information, please refer to the [NOTES_ON_METAL_BUGS.md](NOTES_ON_METAL_BUGS.md) file.
+
 MLX Stable Diffusion WebUI
 ====================================
 This is a straightforward web interface for the Apple MLX Stable Diffusion example.
