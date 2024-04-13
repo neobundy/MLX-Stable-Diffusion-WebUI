@@ -4,6 +4,8 @@ Due to serious Metal bugs, at least for me, that can't be managed, I won't be ac
 
 For more information, please refer to the [NOTES_ON_METAL_BUGS.md](NOTES_ON_METAL_BUGS.md) file.
 
+‼️Important Final Note: I'm archiving this repository as of April 13, 2024. I will keep the repository up for reference, but I won't be updating it. I am moving on to other projects. I hope this repository has been helpful to you. Thank you for your support.
+
 MLX Stable Diffusion WebUI
 ====================================
 This is a straightforward web interface for the Apple MLX Stable Diffusion example.
